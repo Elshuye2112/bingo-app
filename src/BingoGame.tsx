@@ -40,11 +40,6 @@ const generateBingoCard = (): number[] => {
   return card;
 };
 
-interface GameHistoryEntry {
-  winner: number; // player index 0 or 1
-  timestamp: string;
-}
-
 const BingoGame = () => {
   const [playerBoards, setPlayerBoards] = useState([generateBingoCard(), generateBingoCard()]);
   const [markedCells, setMarkedCells] = useState<number[][]>([[12], [12]]);
@@ -52,15 +47,11 @@ const BingoGame = () => {
   const [drawnNumbers, setDrawnNumbers] = useState<number[]>([]);
   const [winner, setWinner] = useState<number | null>(null);
 
-  // New states for scoreboard and game history
-  const [scoreboard, setScoreboard] = useState<{ player1: number; player2: number }>({
-    player1: 0,
-    player2: 0,
-  });
-  const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
-
   const clickSound = new Audio('/sounds/click.mp3');
   const winSound = new Audio('/sounds/win.mp3');
+
+  const [chatMessages, setChatMessages] = useState<{ sender: string, text: string, time: string }[]>([]);
+  const [playerInputs, setPlayerInputs] = useState({ player1: '', player2: '' });
 
   useEffect(() => {
     const numbers = Array.from({ length: 75 }, (_, i) => i + 1);
@@ -99,19 +90,6 @@ const BingoGame = () => {
       if (checkWin(marks) && winner === null) {
         setWinner(index);
         winSound.play();
-
-        // Update scoreboard
-        const key = `player${index + 1}` as 'player1' | 'player2';
-        setScoreboard(prev => ({
-          ...prev,
-          [key]: prev[key] + 1,
-        }));
-
-        // Record game history with timestamp
-        setGameHistory(prev => [
-          ...prev,
-          { winner: index, timestamp: new Date().toLocaleString() },
-        ]);
       }
     });
   };
@@ -121,7 +99,7 @@ const BingoGame = () => {
     setMarkedCells([[12], [12]]);
     setDrawnNumbers([]);
     setWinner(null);
-
+    setChatMessages([]);
     const numbers = Array.from({ length: 75 }, (_, i) => i + 1);
     for (let i = numbers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -155,15 +133,25 @@ const BingoGame = () => {
     </Box>
   );
 
+  const sendMessage = (player: 'player1' | 'player2') => {
+    const text = playerInputs[player].trim();
+    if (text === '') return;
+
+    const newMessage = {
+      sender: player === 'player1' ? 'Player 1' : 'Player 2',
+      text,
+      time: new Date().toLocaleTimeString(),
+    };
+
+    setChatMessages(prev => [...prev, newMessage]);
+    setPlayerInputs(prev => ({ ...prev, [player]: '' }));
+  };
+
   return (
     <Box textAlign="center" p={2}>
-      <Typography variant="h4" gutterBottom>Real Bingo Multiplayer</Typography>
-      <Button
-        variant="contained"
-        color="secondary"
-        onClick={handleDraw}
-        disabled={winner !== null || drawPool.length === 0}
-      >
+      <Typography variant="h4" gutterBottom>🎯 Real Bingo Multiplayer</Typography>
+
+      <Button variant="contained" color="secondary" onClick={handleDraw} disabled={winner !== null || drawPool.length === 0}>
         🎱 Draw Number
       </Button>
       <Typography mt={2}>Drawn: {drawnNumbers.join(', ')}</Typography>
@@ -186,24 +174,49 @@ const BingoGame = () => {
         </Button>
       </Box>
 
-      {/* New Scoreboard & History Section */}
-      <Box mt={6} textAlign="left" maxWidth={600} mx="auto">
-        <Typography variant="h5" gutterBottom>Scoreboard</Typography>
-        <Typography>Player 1 Wins: {scoreboard.player1}</Typography>
-        <Typography>Player 2 Wins: {scoreboard.player2}</Typography>
+      {/* 🗨️ Chat Section */}
+      <Box mt={6} maxWidth={600} mx="auto">
+        <Typography variant="h5" gutterBottom>🗨️ Player Chat</Typography>
 
-        <Typography variant="h5" gutterBottom mt={4}>Game History</Typography>
-        {gameHistory.length === 0 ? (
-          <Typography>No games played yet.</Typography>
-        ) : (
-          <ul>
-            {gameHistory.map((entry, idx) => (
-              <li key={idx}>
-                Player {entry.winner + 1} won at {entry.timestamp}
-              </li>
-            ))}
-          </ul>
-        )}
+        <Box
+          sx={{
+            border: '1px solid gray',
+            borderRadius: 2,
+            height: 200,
+            overflowY: 'auto',
+            backgroundColor: '#f5f5f5',
+            padding: 1,
+            mb: 2,
+          }}
+        >
+          {chatMessages.map((msg, index) => (
+            <Box key={index} mb={1}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                {msg.sender} <span style={{ fontSize: '0.8rem', color: 'gray' }}>({msg.time})</span>
+              </Typography>
+              <Typography variant="body1">{msg.text}</Typography>
+            </Box>
+          ))}
+        </Box>
+
+        <Box display="flex" gap={2} flexDirection="column">
+          {(['player1', 'player2'] as const).map(player => (
+            <Box key={player} display="flex" gap={1}>
+              <input
+                type="text"
+                placeholder={`${player === 'player1' ? 'Player 1' : 'Player 2'} message...`}
+                value={playerInputs[player]}
+                onChange={(e) =>
+                  setPlayerInputs(prev => ({ ...prev, [player]: e.target.value }))
+                }
+                style={{ flexGrow: 1, padding: '8px' }}
+              />
+              <Button variant="contained" onClick={() => sendMessage(player)}>
+                Send
+              </Button>
+            </Box>
+          ))}
+        </Box>
       </Box>
     </Box>
   );
