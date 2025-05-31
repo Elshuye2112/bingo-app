@@ -40,6 +40,11 @@ const generateBingoCard = (): number[] => {
   return card;
 };
 
+interface GameHistoryEntry {
+  winner: number; // player index 0 or 1
+  timestamp: string;
+}
+
 const BingoGame = () => {
   const [playerBoards, setPlayerBoards] = useState([generateBingoCard(), generateBingoCard()]);
   const [markedCells, setMarkedCells] = useState<number[][]>([[12], [12]]);
@@ -47,10 +52,16 @@ const BingoGame = () => {
   const [drawnNumbers, setDrawnNumbers] = useState<number[]>([]);
   const [winner, setWinner] = useState<number | null>(null);
 
+  // New states for scoreboard and game history
+  const [scoreboard, setScoreboard] = useState<{ player1: number; player2: number }>({
+    player1: 0,
+    player2: 0,
+  });
+  const [gameHistory, setGameHistory] = useState<GameHistoryEntry[]>([]);
+
   const clickSound = new Audio('/sounds/click.mp3');
   const winSound = new Audio('/sounds/win.mp3');
 
-  // 🎯 Generate the draw pool on first load
   useEffect(() => {
     const numbers = Array.from({ length: 75 }, (_, i) => i + 1);
     for (let i = numbers.length - 1; i > 0; i--) {
@@ -88,6 +99,19 @@ const BingoGame = () => {
       if (checkWin(marks) && winner === null) {
         setWinner(index);
         winSound.play();
+
+        // Update scoreboard
+        const key = `player${index + 1}` as 'player1' | 'player2';
+        setScoreboard(prev => ({
+          ...prev,
+          [key]: prev[key] + 1,
+        }));
+
+        // Record game history with timestamp
+        setGameHistory(prev => [
+          ...prev,
+          { winner: index, timestamp: new Date().toLocaleString() },
+        ]);
       }
     });
   };
@@ -97,6 +121,7 @@ const BingoGame = () => {
     setMarkedCells([[12], [12]]);
     setDrawnNumbers([]);
     setWinner(null);
+
     const numbers = Array.from({ length: 75 }, (_, i) => i + 1);
     for (let i = numbers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -133,7 +158,12 @@ const BingoGame = () => {
   return (
     <Box textAlign="center" p={2}>
       <Typography variant="h4" gutterBottom>Real Bingo Multiplayer</Typography>
-      <Button variant="contained" color="secondary" onClick={handleDraw} disabled={winner !== null || drawPool.length === 0}>
+      <Button
+        variant="contained"
+        color="secondary"
+        onClick={handleDraw}
+        disabled={winner !== null || drawPool.length === 0}
+      >
         🎱 Draw Number
       </Button>
       <Typography mt={2}>Drawn: {drawnNumbers.join(', ')}</Typography>
@@ -154,6 +184,26 @@ const BingoGame = () => {
         <Button variant="contained" onClick={resetGame} sx={{ mt: 2 }}>
           🔄 Reset Game
         </Button>
+      </Box>
+
+      {/* New Scoreboard & History Section */}
+      <Box mt={6} textAlign="left" maxWidth={600} mx="auto">
+        <Typography variant="h5" gutterBottom>Scoreboard</Typography>
+        <Typography>Player 1 Wins: {scoreboard.player1}</Typography>
+        <Typography>Player 2 Wins: {scoreboard.player2}</Typography>
+
+        <Typography variant="h5" gutterBottom mt={4}>Game History</Typography>
+        {gameHistory.length === 0 ? (
+          <Typography>No games played yet.</Typography>
+        ) : (
+          <ul>
+            {gameHistory.map((entry, idx) => (
+              <li key={idx}>
+                Player {entry.winner + 1} won at {entry.timestamp}
+              </li>
+            ))}
+          </ul>
+        )}
       </Box>
     </Box>
   );
